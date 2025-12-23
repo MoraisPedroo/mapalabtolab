@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Monitoramento Laboratorial - Brasil</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; overflow: hidden; }
+        
+        /* --- Mapa Responsivo --- */
+        .map-outer-container {
+            height: 100vh; width: 100vw; padding: 1rem;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; z-index: 0;
+        }
+        .map-wrapper-responsive {
+            width: 100%; height: 100%; max-height: 90vh; max-width: 1200px;
+            display: flex; justify-content: center; align-items: center;
+            filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04));
+        }
+        .state-path {
+            fill: #cbd5e1; stroke: #fff; stroke-width: 1.5px; cursor: pointer; transition: all 0.2s ease;
+            vector-effect: non-scaling-stroke;
+        }
+        .state-path:hover { fill: #94a3b8; transform: translateY(-2px); }
+        .state-path.active { fill: #4f46e5 !important; filter: drop-shadow(0 0 8px rgba(79, 70, 229, 0.4)); z-index: 10; }
+        .map-wrapper-responsive.has-active .state-path:not(.active) { fill: #e2e8f0; opacity: 0.6; }
+
+        /* --- Sidebar --- */
+        #sidebar-panel { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .lc-details { transition: max-height 0.3s ease-out; max-height: 0; overflow: hidden; }
+        .lc-details.open { max-height: 500px; overflow-y: auto; }
+        .group.active .rotate-icon { transform: rotate(180deg); }
+        
+        /* --- Busca Global --- */
+        #search-container { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 48px; }
+        #search-container.expanded { width: 320px; } 
+        #global-search-input { transition: opacity 0.3s ease 0.1s; opacity: 0; pointer-events: none; }
+        #search-container.expanded #global-search-input { opacity: 1; pointer-events: auto; }
+        
+        #search-results-dropdown {
+            opacity: 0; visibility: hidden; transform: translateY(-10px);
+            transition: all 0.2s ease; pointer-events: none;
+        }
+        #search-results-dropdown.has-results { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
+        
+        .filter-btn { transition: all 0.2s; border: 1px solid transparent; }
+        .filter-btn.active { background-color: #e0e7ff; color: #4338ca; border-color: #c7d2fe; font-weight: 600; }
+        .filter-btn:not(.active):hover { background-color: #f8fafc; color: #64748b; }
+
+        @keyframes highlight-pulse { 0% { background-color: #fff; } 50% { background-color: #e0e7ff; } 100% { background-color: #fff; } }
+        .highlight-card { animation: highlight-pulse 1.5s ease-in-out 2; border-color: #6366f1; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden bg-slate-50">
+
+    <main class="h-full w-full relative overflow-hidden group">
+        <div class="absolute top-4 left-4 lg:top-8 lg:left-8 z-20 pointer-events-none select-none">
+            <h1 class="text-xl md:text-2xl font-bold text-slate-800">Monitoramento <span class="text-indigo-600">Brasil</span></h1>
+            <p class="text-xs md:text-sm text-slate-500 font-medium">Sistema de Controle de Impressão</p>
+        </div>
+
+        <div class="absolute top-4 right-4 lg:top-8 lg:right-8 z-40 flex flex-col items-end">
+            <div id="search-container" class="relative flex items-center bg-white rounded-2xl shadow-lg h-12 border border-slate-100 z-50">
+                <button id="search-trigger" class="flex-shrink-0 w-12 h-12 flex items-center justify-center text-slate-400 hover:text-indigo-600 z-20 relative focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+                <input type="text" id="global-search-input" placeholder="Buscar..." 
+                    class="absolute left-0 top-0 w-full h-full pl-12 pr-10 border-0 rounded-2xl focus:ring-0 outline-none text-sm bg-transparent z-10 text-slate-700 font-medium"
+                    autocomplete="off">
+                <button id="clear-search" class="hidden absolute right-3 z-20 text-slate-300 hover:text-slate-500">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            
+            <div id="search-results-dropdown" class="mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden max-h-[60vh] flex flex-col z-40">
+                
+                <div class="flex-shrink-0 bg-white z-10 relative shadow-sm">
+                    <div class="p-2 border-b border-slate-100 bg-slate-50 flex gap-2 overflow-x-auto custom-scroll">
+                        <button class="filter-btn active text-[10px] uppercase px-3 py-1.5 rounded-full text-slate-500 bg-white border-slate-200 whitespace-nowrap" onclick="setSearchFilter('all')">Todos</button>
+                        <button class="filter-btn text-[10px] uppercase px-3 py-1.5 rounded-full text-slate-500 bg-white border-slate-200 whitespace-nowrap" onclick="setSearchFilter('serial')">Serial</button>
+                        <button class="filter-btn text-[10px] uppercase px-3 py-1.5 rounded-full text-slate-500 bg-white border-slate-200 whitespace-nowrap" onclick="setSearchFilter('lc')">LC</button>
+                        <button class="filter-btn text-[10px] uppercase px-3 py-1.5 rounded-full text-slate-500 bg-white border-slate-200 whitespace-nowrap" onclick="setSearchFilter('selb')">SELB</button>
+                    </div>
+                    
+                    <div class="px-3 py-2 bg-white border-b border-slate-50 flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resultados</span>
+                        <span id="results-count" class="text-[10px] font-bold text-white bg-indigo-500 px-2 py-0.5 rounded-full">0</span>
+                    </div>
+                </div>
+                
+                <div id="search-results-list" class="flex-1 overflow-y-auto custom-scroll p-1 relative z-0"></div>
+            </div>
+        </div>
+
+        <div id="global-stats" class="absolute bottom-4 left-4 lg:bottom-8 lg:left-8 z-20 flex gap-3 transition-opacity duration-300">
+            <div class="bg-white/90 backdrop-blur-sm p-3 lg:p-4 rounded-2xl shadow-lg border border-slate-100 w-28 lg:w-32">
+                <p class="text-[10px] lg:text-xs text-slate-400 font-bold uppercase tracking-wider">Estados</p>
+                <p class="text-xl lg:text-2xl font-extrabold text-slate-800 leading-tight" id="total-states-count">-</p>
+            </div>
+            <div class="bg-white/90 backdrop-blur-sm p-3 lg:p-4 rounded-2xl shadow-lg border border-slate-100 w-28 lg:w-32">
+                <p class="text-[10px] lg:text-xs text-slate-400 font-bold uppercase tracking-wider">Registros</p>
+                <p class="text-xl lg:text-2xl font-extrabold text-indigo-600 leading-tight" id="total-records-count">-</p>
+            </div>
+        </div>
+
+        <div class="map-outer-container">
+            <div id="map-wrapper" class="map-wrapper-responsive relative">
+                <p id="loading-text" class="text-slate-400 animate-pulse font-medium">Carregando mapa...</p>
+                <div id="map-tooltip" class="absolute hidden bg-slate-800 text-white text-xs font-medium py-1.5 px-3 rounded-md shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-8px] z-50 whitespace-nowrap"></div>
+            </div>
+        </div>
+    </main>
+
+    <aside id="sidebar-panel" class="fixed right-0 top-0 h-full w-full md:w-[450px] bg-white shadow-2xl transform translate-x-full flex flex-col border-l border-slate-100">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/80 z-10">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span id="detail-state-badge" class="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-[11px] font-bold rounded-full uppercase tracking-wider">Estado</span>
+                    <h2 id="detail-state-name" class="text-2xl md:text-3xl font-bold text-slate-800 mt-3 leading-none">Selecione</h2>
+                </div>
+                <button id="close-sidebar" class="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500 focus:outline-none">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="relative">
+                <input type="text" id="local-search" placeholder="Filtrar neste estado (LC ou Serial)..." 
+                    class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border-2 border-slate-100 focus:border-indigo-500 outline-none text-sm transition-all shadow-sm font-medium text-slate-600">
+                <svg class="w-5 h-5 text-slate-400 absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 custom-scroll space-y-6 bg-white">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-50 border border-slate-100 p-4 rounded-2xl shadow-sm text-center">
+                    <p class="text-3xl font-extrabold text-indigo-600 leading-tight" id="detail-lc-count">0</p>
+                    <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-1">Laboratórios</p>
+                </div>
+                <div class="bg-slate-50 border border-slate-100 p-4 rounded-2xl shadow-sm text-center">
+                    <p class="text-3xl font-extrabold text-emerald-500 leading-tight" id="detail-serial-count">0</p>
+                    <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-1">Total Seriais</p>
+                </div>
+            </div>
+            <div>
+                <div id="lc-list-container" class="space-y-3"></div>
+                <div id="no-filter-results" class="hidden text-center text-slate-400 py-8 text-sm font-medium bg-slate-50 rounded-xl border border-slate-100 italic">Nenhum resultado local.</div>
+            </div>
+        </div>
+    </aside>
+
+    <script src="dados_locais.js"></script>
+
+    <script>
+        // --- Configuração Global ---
+        let dbData = []; 
+        let activeState = null;
+        let currentSearchFilter = 'all'; // 'all', 'serial', 'lc', 'selb'
+        let els = {}; 
+        const stateNames = { 'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins' };
+
+        function init() {
+            els = {
+                sidebar: document.getElementById('sidebar-panel'),
+                mapWrapper: document.getElementById('map-wrapper'),
+                closeBtn: document.getElementById('close-sidebar'),
+                tooltip: document.getElementById('map-tooltip'),
+                globalStats: document.getElementById('global-stats'),
+                dStateName: document.getElementById('detail-state-name'),
+                dStateBadge: document.getElementById('detail-state-badge'),
+                dLcCount: document.getElementById('detail-lc-count'),
+                dSerialCount: document.getElementById('detail-serial-count'),
+                lcList: document.getElementById('lc-list-container'),
+                kpiStates: document.getElementById('total-states-count'),
+                kpiRecords: document.getElementById('total-records-count'),
+                searchContainer: document.getElementById('search-container'),
+                searchTrigger: document.getElementById('search-trigger'),
+                globalInput: document.getElementById('global-search-input'),
+                searchResultsDropdown: document.getElementById('search-results-dropdown'),
+                searchResultsList: document.getElementById('search-results-list'),
+                resultsCount: document.getElementById('results-count'),
+                clearSearchBtn: document.getElementById('clear-search'),
+                localSearch: document.getElementById('local-search'),
+                noFilterResults: document.getElementById('no-filter-results')
+            };
+
+            setupEventListeners();
+            fetchData(); 
+            loadMap();
+        }
+
+        function setupEventListeners() {
+            if(els.closeBtn) els.closeBtn.addEventListener('click', closeSidebar);
+            els.searchTrigger.addEventListener('click', toggleGlobalSearch);
+            els.clearSearchBtn.addEventListener('click', () => {
+                els.globalInput.value = '';
+                handleGlobalSearchInput();
+                els.globalInput.focus();
+            });
+            document.addEventListener('click', (e) => {
+                if (els.searchContainer.classList.contains('expanded') && 
+                    !els.searchContainer.contains(e.target) && 
+                    !els.searchResultsDropdown.contains(e.target)) {
+                    closeGlobalSearch();
+                }
+            });
+            els.globalInput.addEventListener('input', handleGlobalSearchInput);
+            els.localSearch.addEventListener('input', handleLocalSearch);
+        }
+
+        function loadMap() {
+            fetch('assets/map.svg') 
+                .then(res => { if (!res.ok) throw new Error("Erro"); return res.text(); })
+                .then(svgData => {
+                    if(els.mapWrapper) {
+                        els.mapWrapper.innerHTML = svgData;
+                        const svg = els.mapWrapper.querySelector('svg');
+                        if(svg) {
+                            svg.setAttribute('width', '100%');
+                            svg.setAttribute('height', '100%');
+                            svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                            els.mapWrapper.appendChild(els.tooltip); 
+                            setupMapInteractions(svg);
+                        }
+                    }
+                });
+        }
+
+        function setupMapInteractions(svg) {
+            svg.querySelectorAll('path').forEach(p => {
+                p.classList.add('state-path');
+                if(p.id) {
+                    p.addEventListener('click', (e) => selectState(e.target.id.toUpperCase()));
+                    p.addEventListener('mouseenter', (e) => {
+                        const id = e.target.id.toUpperCase();
+                        const count = dbData.filter(d => d.estado === id).length;
+                        showTooltip(e, `${stateNames[id] || id} • ${count}`);
+                    });
+                    p.addEventListener('mousemove', moveTooltip);
+                    p.addEventListener('mouseleave', hideTooltip);
+                }
+            });
+        }
+
+        async function fetchData() {
+            const localRaw = (typeof BANCO_INTERNO !== 'undefined') ? BANCO_INTERNO : [];
+            const normalizedInternal = localRaw.map(item => ({
+                lc: String(item.lc),
+                serial: String(item.numero_serie),
+                selb: item.selb || '',
+                estado: item.uf ? item.uf.toUpperCase() : 'XX',
+                cidade: item.cidade,
+                data_registro: null,
+                source: 'internal'
+            }));
+
+            dbData = normalizedInternal;
+            updateGlobalStats();
+
+            const url = 'https://dpprinter-logs-ff3a7-default-rtdb.firebaseio.com/inventario.json';
+            try {
+                const response = await fetch(url);
+                const rawData = await response.json();
+                
+                if (rawData) {
+                    const processedFirebase = [];
+                    for (const lcCode in rawData) {
+                        for (const serialKey in rawData[lcCode]) {
+                            const item = rawData[lcCode][serialKey];
+                            let dateObj = null;
+                            if (item.data_registro) dateObj = new Date(item.data_registro.replace(' ', 'T'));
+                            
+                            processedFirebase.push({
+                                lc: String(item.lc),
+                                serial: String(item.serial),
+                                selb: item.selb || '',
+                                estado: item.estado ? item.estado.toUpperCase() : 'XX',
+                                cidade: item.cidade,
+                                data_registro: dateObj,
+                                source: 'firebase'
+                            });
+                        }
+                    }
+                    dbData = [...normalizedInternal, ...processedFirebase];
+                    updateGlobalStats();
+                }
+            } catch (error) { console.error("Erro Firebase", error); }
+        }
+
+        function updateGlobalStats() {
+            if(els.kpiStates) els.kpiStates.textContent = [...new Set(dbData.map(d => d.estado))].length;
+            if(els.kpiRecords) els.kpiRecords.textContent = dbData.length.toLocaleString('pt-BR');
+        }
+
+        // --- BUSCAS ---
+        function toggleGlobalSearch() {
+            els.searchContainer.classList.toggle('expanded');
+            if (els.searchContainer.classList.contains('expanded')) els.globalInput.focus();
+        }
+        function closeGlobalSearch() {
+            els.searchContainer.classList.remove('expanded');
+            els.searchResultsDropdown.classList.remove('has-results');
+            els.globalInput.blur();
+        }
+
+        window.setSearchFilter = function(filter) {
+            currentSearchFilter = filter;
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('onclick').includes(filter)) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            if (els.globalInput.value.trim() !== '') {
+                handleGlobalSearchInput();
+                els.globalInput.focus();
+            }
+        };
+
+        function handleGlobalSearchInput() {
+            const query = els.globalInput.value.trim().toUpperCase();
+            els.clearSearchBtn.classList.toggle('hidden', query.length === 0);
+
+            if (query.length === 0) {
+                els.searchResultsDropdown.classList.remove('has-results');
+                return;
+            }
+
+            const matches = dbData.filter(d => {
+                const matchSerial = d.serial.toUpperCase().includes(query);
+                const matchLC = d.lc.includes(query);
+                const matchSELB = d.selb && d.selb.toUpperCase().includes(query);
+
+                if (currentSearchFilter === 'all') return matchSerial || matchLC || matchSELB;
+                if (currentSearchFilter === 'serial') return matchSerial;
+                if (currentSearchFilter === 'lc') return matchLC;
+                if (currentSearchFilter === 'selb') return matchSELB;
+                return false;
+            }).slice(0, 50);
+
+            renderSearchResults(matches, query);
+        }
+
+        function renderSearchResults(matches, query) {
+            els.searchResultsList.innerHTML = '';
+            els.resultsCount.textContent = matches.length;
+
+            if (matches.length === 0) {
+                els.searchResultsList.innerHTML = `<div class="p-6 text-center text-slate-400 text-sm font-medium">Nenhum resultado encontrado.</div>`;
+            } else {
+                matches.forEach(match => {
+                    const el = document.createElement('div');
+                    el.className = 'p-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors flex justify-between items-center group';
+                    
+                    const dateStr = match.data_registro ? match.data_registro.toLocaleDateString('pt-BR') : 'Local';
+                    const highlight = (text) => text.replace(new RegExp(query, 'gi'), match => `<span class="text-indigo-600 font-extrabold bg-indigo-100 px-0.5 rounded">${match}</span>`);
+
+                    const selbDisplay = match.selb ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded mr-1">SELB: ${highlight(match.selb)}</span>` : '';
+
+                    el.innerHTML = `
+                        <div class="flex-1 min-w-0 pr-4">
+                            <div class="flex items-center flex-wrap gap-1 mb-1">
+                                ${selbDisplay}
+                                <span class="font-mono font-bold text-slate-700 text-sm truncate">${highlight(match.serial)}</span>
+                                <span class="text-[10px] px-1.5 py-0.5 bg-slate-200 rounded text-slate-600 font-bold">${match.estado}</span>
+                            </div>
+                            <div class="text-xs text-slate-500">LC: <span class="font-semibold">${highlight(match.lc)}</span></div>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <div class="text-[10px] text-slate-400 font-medium">${dateStr}</div>
+                            <span class="text-xs text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold">Ver &rarr;</span>
+                        </div>
+                    `;
+
+                    el.addEventListener('click', () => {
+                        selectState(match.estado, match.lc);
+                        closeGlobalSearch();
+                    });
+
+                    els.searchResultsList.appendChild(el);
+                });
+            }
+            els.searchResultsDropdown.classList.add('has-results');
+        }
+
+        // --- SIDEBAR ---
+        function selectState(uf, targetLc = null) {
+            activeState = uf;
+            document.querySelectorAll('.state-path').forEach(p => p.classList.remove('active'));
+            const el = document.getElementById(uf) || document.getElementById(uf.toLowerCase());
+            if(el) el.classList.add('active');
+            
+            if(els.mapWrapper) els.mapWrapper.classList.add('has-active');
+            if(els.sidebar) els.sidebar.classList.remove('translate-x-full');
+            if(els.globalStats && window.innerWidth < 768) els.globalStats.classList.add('opacity-0');
+
+            els.localSearch.value = ''; 
+            populateSidebar(uf, targetLc);
+        }
+
+        function closeSidebar() {
+            activeState = null;
+            document.querySelectorAll('.state-path').forEach(p => p.classList.remove('active'));
+            if(els.mapWrapper) els.mapWrapper.classList.remove('has-active');
+            if(els.sidebar) els.sidebar.classList.add('translate-x-full');
+            if(els.globalStats) els.globalStats.classList.remove('opacity-0');
+        }
+
+        function populateSidebar(uf, targetLc = null) {
+            const stateData = dbData.filter(d => d.estado === uf);
+            const lcs = [...new Set(stateData.map(d => d.lc))].sort();
+
+            els.dStateName.textContent = stateNames[uf] || uf;
+            els.dStateBadge.textContent = uf;
+            els.dLcCount.textContent = lcs.length;
+            els.dSerialCount.textContent = stateData.length;
+            els.lcList.innerHTML = '';
+            els.noFilterResults.classList.add('hidden');
+
+            if (lcs.length === 0) {
+                els.lcList.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-4">Vazio.</p>`;
+                return;
+            }
+
+            lcs.forEach(lc => {
+                const lcRecords = stateData.filter(d => d.lc === lc);
+                
+                lcRecords.sort((a,b) => {
+                    if (!a.data_registro) return 1;
+                    if (!b.data_registro) return -1;
+                    return b.data_registro - a.data_registro;
+                });
+
+                const city = lcRecords[0].cidade || 'Local Desconhecido';
+                const isTarget = (targetLc && String(lc) === String(targetLc));
+                const openClass = isTarget ? 'open' : '';
+                const activeClass = isTarget ? 'active' : '';
+                const highlightClass = isTarget ? 'highlight-card' : '';
+
+                const card = document.createElement('div');
+                card.className = `lc-card bg-white border-2 border-slate-100 rounded-xl overflow-hidden group mb-3 transition-all hover:border-indigo-200 hover:shadow-sm ${activeClass} ${highlightClass}`;
+                
+                const header = document.createElement('div');
+                header.className = 'p-4 flex justify-between items-center cursor-pointer bg-white hover:bg-slate-50/50 transition-colors';
+                header.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-extrabold text-indigo-700 shadow-sm">LC</div>
+                            <span class="font-bold text-slate-700 text-lg">LC ${lc}</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1 ml-12 font-medium flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            ${city}
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full text-slate-500">${lcRecords.length}</span>
+                        <svg class="w-5 h-5 text-slate-300 rotate-icon transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                `;
+
+                const details = document.createElement('div');
+                details.className = `lc-details bg-slate-50 border-t border-slate-100 ${openClass}`;
+                
+                let serialsHtml = '<ul class="divide-y divide-slate-100">';
+                lcRecords.forEach(record => {
+                    const dateStr = record.data_registro 
+                        ? record.data_registro.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) 
+                        : '';
+                    
+                    const sourceIcon = record.source === 'firebase' 
+                        ? `<svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="App/Nuvem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>`
+                        : `<svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="Banco Local"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>`;
+
+                    const selbHtml = record.selb ? `<span class="text-xs font-mono text-slate-400 mr-2 border-r border-slate-200 pr-2">${record.selb}</span>` : '';
+
+                    serialsHtml += `
+                        <li class="px-4 py-3 hover:bg-slate-100 transition-colors flex justify-between items-center text-sm">
+                            <div class="flex items-center gap-2.5">
+                                ${sourceIcon}
+                                <div>
+                                    ${selbHtml}
+                                    <span class="font-semibold text-slate-700 font-mono tracking-tight">${record.serial}</span>
+                                </div>
+                            </div>
+                            <span class="text-[10px] font-medium text-slate-400 whitespace-nowrap">${dateStr}</span>
+                        </li>
+                    `;
+                });
+                serialsHtml += '</ul>';
+                details.innerHTML = serialsHtml;
+
+                header.addEventListener('click', () => {
+                    const isOpen = details.classList.contains('open');
+                    if(isOpen) { details.classList.remove('open'); card.classList.remove('active'); }
+                    else { details.classList.add('open'); card.classList.add('active'); }
+                });
+
+                card.appendChild(header);
+                card.appendChild(details);
+                els.lcList.appendChild(card);
+
+                if(isTarget) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+            });
+        }
+
+        function handleLocalSearch() {
+            const query = els.localSearch.value.toUpperCase();
+            const cards = document.querySelectorAll('.lc-card');
+            let hasVisible = false;
+            cards.forEach(card => {
+                if (card.innerText.toUpperCase().includes(query)) {
+                    card.style.display = 'block';
+                    if(query.length > 0) { card.querySelector('.lc-details').classList.add('open'); card.classList.add('active'); }
+                    else { card.querySelector('.lc-details').classList.remove('open'); card.classList.remove('active'); }
+                    hasVisible = true;
+                } else { card.style.display = 'none'; }
+            });
+            els.noFilterResults.classList.toggle('hidden', hasVisible || cards.length === 0);
+        }
+
+        function showTooltip(e, text) { if(els.tooltip) { els.tooltip.textContent = text; els.tooltip.classList.remove('hidden'); moveTooltip(e); }}
+        function moveTooltip(e) { if(els.tooltip) { els.tooltip.style.left = `${e.pageX}px`; els.tooltip.style.top = `${e.pageY + (window.innerWidth<768?-40:0)}px`; }}
+        function hideTooltip() { if(els.tooltip) els.tooltip.classList.add('hidden'); }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
