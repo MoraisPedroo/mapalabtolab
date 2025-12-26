@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DP Printer Monitor</title>
+    <link rel="icon" href="logo.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; overflow: hidden; }
         
         /* --- Mapa --- */
         .map-outer-container {
@@ -36,37 +37,58 @@
         .lc-details { transition: max-height 0.4s ease; max-height: 0; overflow: hidden; }
         .lc-details.open { max-height: 600px; overflow-y: auto; }
         
-        /* --- Busca Global & Filtros --- */
-        #search-container { transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1); width: 50px; }
-        #search-container.expanded { width: 380px; } 
-        
+        /* --- Busca e Dropdown --- */
+        #search-container { transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1); width: 48px; }
+        #search-container.expanded { width: 340px; } 
         #global-search-input { transition: opacity 0.2s ease 0.1s; opacity: 0; pointer-events: none; }
         #search-container.expanded #global-search-input { opacity: 1; pointer-events: auto; }
 
-        /* Dropdown Moderno */
+        /* Dropdown com Animação de Entrada/Saída */
         #search-results-dropdown {
             opacity: 0; visibility: hidden; transform: translateY(-10px) scale(0.98);
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
         }
-        #search-results-dropdown.has-results { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
+        #search-results-dropdown.visible { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
 
-        /* Botões de Filtro (Cápsulas) */
+        /* --- Botões de Controle Externos (Topo) --- */
+        .control-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 16px; border-radius: 99px;
+            font-size: 12px; font-weight: 600;
+            background: white; border: 1px solid #e2e8f0; color: #64748b;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer; select-none: none;
+        }
+        .control-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .control-btn:active { transform: translateY(0); }
+
+        .control-btn[data-active="true"][data-type="local"] { background-color: #ecfdf5; border-color: #10b981; color: #059669; }
+        .control-btn[data-active="true"][data-type="server"] { background-color: #eff6ff; border-color: #3b82f6; color: #2563eb; }
+        .control-btn[data-active="false"] { opacity: 0.6; filter: grayscale(100%); background-color: #f8fafc; }
+
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: #cbd5e1; transition: background-color 0.3s; }
+        .control-btn[data-active="true"][data-type="local"] .status-dot { background-color: #10b981; box-shadow: 0 0 6px #10b981; }
+        .control-btn[data-active="true"][data-type="server"] .status-dot { background-color: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
+
+        /* Botão Ação Nuvem (Destaque) */
+        .cloud-action-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            color: white; border-radius: 99px; font-weight: 600; font-size: 11px;
+            padding: 8px 16px; display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); border: none;
+        }
+        .cloud-action-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3); }
+
+        /* --- Filtros Internos (Pills) --- */
         .type-filter-btn {
-            font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
-            padding: 4px 10px; border-radius: 99px; border: 1px solid #e2e8f0; color: #64748b; background: white;
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+            padding: 5px 12px; border-radius: 6px; border: 1px solid #e2e8f0; color: #64748b; background: white;
             transition: all 0.2s;
         }
-        .type-filter-btn:hover { background: #f1f5f9; color: #334155; }
-        .type-filter-btn.active { background: #4f46e5; color: white; border-color: #4338ca; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2); }
-
-        /* Botões de Fonte (Segmented Control) */
-        .source-btn {
-            flex: 1; text-align: center; padding: 6px; font-size: 11px; font-weight: 600;
-            color: #64748b; border-radius: 8px; transition: all 0.2s;
-            display: flex; align-items: center; justify-content: center; gap: 4px;
-        }
-        .source-btn:hover { background-color: rgba(255,255,255,0.5); }
-        .source-btn.active { background-color: white; color: #4f46e5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .type-filter-btn:hover { background: #f8fafc; color: #334155; }
+        .type-filter-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
 
         @keyframes highlight-pulse { 0% { background-color: #fff; } 50% { background-color: #e0e7ff; } 100% { background-color: #fff; } }
         .highlight-card { animation: highlight-pulse 2s ease-in-out infinite; border-color: #6366f1; }
@@ -80,56 +102,59 @@
             <p class="text-xs text-slate-400 font-medium ml-0.5">Gestão Inteligente de Ativos</p>
         </div>
 
-        <div class="absolute top-6 right-6 z-40 flex flex-col items-end">
-            <div id="search-container" class="relative flex items-center bg-white rounded-full shadow-xl shadow-slate-200/50 h-12 border border-slate-100 z-50">
-                <button id="search-trigger" class="flex-shrink-0 w-12 h-12 flex items-center justify-center text-slate-400 hover:text-indigo-600 z-20 relative focus:outline-none transition-colors">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        <div class="absolute top-6 right-6 z-40 flex items-center gap-4">
+            
+            <div class="flex items-center gap-2 bg-white/60 backdrop-blur-md p-1.5 rounded-full border border-white shadow-lg shadow-slate-200/50">
+                
+                <button id="btn-local" class="control-btn" data-type="local" data-active="true" onclick="toggleSource('local', event)">
+                    <span class="status-dot"></span>
+                    <span>Locais</span>
                 </button>
-                
-                <input type="text" id="global-search-input" placeholder="Buscar..." 
-                    class="absolute left-0 top-0 w-full h-full pl-12 pr-12 border-0 rounded-full focus:ring-0 outline-none text-sm bg-transparent z-10 text-slate-700 font-medium placeholder:text-slate-400"
-                    autocomplete="off">
-                
-                <button id="filter-toggle-btn" class="absolute right-2 z-20 p-2 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition-all" title="Filtros">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+
+                <button id="btn-server" class="control-btn" data-type="server" data-active="true" onclick="toggleSource('server', event)">
+                    <span class="status-dot"></span>
+                    <span>Nuvem</span>
+                </button>
+
+                <div class="w-px h-6 bg-slate-300 mx-1"></div>
+
+                <button id="btn-action-cloud" onclick="listCloudPrinters(event)" class="cloud-action-btn" title="Garante que a nuvem está ativa e abre a lista">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                    <span>Listagem</span>
                 </button>
             </div>
-            
-            <div id="search-results-dropdown" class="mt-3 w-[380px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden max-h-[75vh] flex flex-col z-40 ring-1 ring-slate-900/5">
-                
-                <div class="px-3 pt-3 pb-2 bg-slate-50 border-b border-slate-100/50">
-                    <div class="flex items-center justify-between mb-1.5 px-1">
-                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Fonte de Dados</span>
-                    </div>
-                    <div class="flex p-1 bg-slate-200/50 rounded-lg">
-                        <button onclick="setSourceFilter('all')" class="source-btn active" data-source="all">
-                            Todos
-                        </button>
-                        <button onclick="setSourceFilter('server')" class="source-btn" data-source="server">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
-                            Nuvem
-                        </button>
-                        <button onclick="setSourceFilter('local')" class="source-btn" data-source="local">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
-                            Local
-                        </button>
-                    </div>
+
+            <div class="relative flex flex-col items-end">
+                <div id="search-container" class="relative flex items-center bg-white rounded-full shadow-xl shadow-slate-200/50 h-12 border border-slate-100 z-50 transition-all">
+                    <button id="search-trigger" class="flex-shrink-0 w-12 h-12 flex items-center justify-center text-slate-400 hover:text-indigo-600 z-20 relative focus:outline-none transition-colors">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </button>
+                    <input type="text" id="global-search-input" placeholder="Pesquisar..." 
+                        class="absolute left-0 top-0 w-full h-full pl-12 pr-6 border-0 rounded-full focus:ring-0 outline-none text-sm bg-transparent z-10 text-slate-700 font-medium placeholder:text-slate-400"
+                        autocomplete="off">
                 </div>
 
-                <div class="px-3 py-2 bg-white border-b border-slate-100 flex items-center gap-2 overflow-x-auto custom-scroll">
-                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex-shrink-0 mr-1">Filtrar por:</span>
-                    <button class="type-filter-btn active" onclick="setTypeFilter('all')" data-type="all">Todos</button>
-                    <button class="type-filter-btn" onclick="setTypeFilter('serial')" data-type="serial">Serial</button>
-                    <button class="type-filter-btn" onclick="setTypeFilter('lc')" data-type="lc">LC</button>
-                    <button class="type-filter-btn" onclick="setTypeFilter('selb')" data-type="selb">SELB</button>
-                </div>
-                
-                <div class="px-4 py-1.5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                    <span class="text-[10px] text-slate-400 font-medium">Resultados encontrados</span>
-                    <span id="results-count" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">0</span>
-                </div>
+                <div id="search-results-dropdown" class="absolute top-14 right-0 w-[360px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden max-h-[80vh] flex flex-col z-40 ring-1 ring-slate-900/5 origin-top-right">
+                    
+                    <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span id="list-header-label" class="text-xs font-bold text-slate-700 uppercase tracking-wider">Resultados</span>
+                            <span id="results-count" class="text-[10px] font-bold text-white bg-indigo-500 px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <button onclick="closeSearch()" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded transition-colors" title="Fechar Lista">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
 
-                <div id="search-results-list" class="flex-1 overflow-y-auto custom-scroll p-2 space-y-1 bg-white relative min-h-[100px]"></div>
+                    <div class="px-3 py-2 bg-white border-b border-slate-100 flex items-center gap-2 overflow-x-auto custom-scroll shadow-sm z-10">
+                        <button class="type-filter-btn active" onclick="setTypeFilter('all')" data-type="all">Todos</button>
+                        <button class="type-filter-btn" onclick="setTypeFilter('serial')" data-type="serial">Serial</button>
+                        <button class="type-filter-btn" onclick="setTypeFilter('lc')" data-type="lc">LC</button>
+                        <button class="type-filter-btn" onclick="setTypeFilter('selb')" data-type="selb">SELB</button>
+                    </div>
+
+                    <div id="search-results-list" class="flex-1 overflow-y-auto custom-scroll p-2 space-y-1 bg-white relative min-h-[100px]"></div>
+                </div>
             </div>
         </div>
 
@@ -194,9 +219,10 @@
         let dbData = []; 
         let activeState = null;
         
-        // ESTADOS DOS FILTROS
-        let filterSource = 'all'; // all, local, server
-        let filterType = 'all';   // all, serial, lc, selb
+        // ESTADOS
+        let filters = { local: true, server: true };
+        let filterType = 'all'; // all, serial, lc, selb
+        let isListOpen = false; 
 
         let els = {}; 
         const stateNames = { 'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte', 'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins' };
@@ -207,26 +233,34 @@
                 mapWrapper: document.getElementById('map-wrapper'),
                 closeBtn: document.getElementById('close-sidebar'),
                 tooltip: document.getElementById('map-tooltip'),
+                
+                // KPIs
+                kpiStates: document.getElementById('total-states-count'),
+                kpiRecords: document.getElementById('total-records-count'),
                 globalStats: document.getElementById('global-stats'),
+                
+                // Sidebar Detalhes
                 dStateName: document.getElementById('detail-state-name'),
                 dStateBadge: document.getElementById('detail-state-badge'),
                 dLcCount: document.getElementById('detail-lc-count'),
                 dSerialCount: document.getElementById('detail-serial-count'),
                 lcList: document.getElementById('lc-list-container'),
-                kpiStates: document.getElementById('total-states-count'),
-                kpiRecords: document.getElementById('total-records-count'),
-                
-                // Busca e Filtros
+                localSearch: document.getElementById('local-search'),
+                noFilterResults: document.getElementById('no-filter-results'),
+
+                // Busca e Lista
                 searchContainer: document.getElementById('search-container'),
                 searchTrigger: document.getElementById('search-trigger'),
-                filterToggleBtn: document.getElementById('filter-toggle-btn'), // NOVO BOTÃO
                 globalInput: document.getElementById('global-search-input'),
                 searchResultsDropdown: document.getElementById('search-results-dropdown'),
                 searchResultsList: document.getElementById('search-results-list'),
                 resultsCount: document.getElementById('results-count'),
+                listHeaderLabel: document.getElementById('list-header-label'),
                 
-                localSearch: document.getElementById('local-search'),
-                noFilterResults: document.getElementById('no-filter-results')
+                // Botões de Controle
+                btnLocal: document.getElementById('btn-local'),
+                btnServer: document.getElementById('btn-server'),
+                btnActionCloud: document.getElementById('btn-action-cloud')
             };
 
             setupEventListeners();
@@ -237,198 +271,155 @@
         function setupEventListeners() {
             if(els.closeBtn) els.closeBtn.addEventListener('click', closeSidebar);
             
-            // Trigger da Busca
-            els.searchTrigger.addEventListener('click', () => { toggleGlobalSearch(); els.globalInput.focus(); });
-            
-            // Trigger do Filtro (Botão Lateral na Barra)
-            els.filterToggleBtn.addEventListener('click', () => { 
-                if(!els.searchContainer.classList.contains('expanded')) toggleGlobalSearch();
-                els.globalInput.focus();
-            });
-
-            // Fechar ao clicar fora
-            document.addEventListener('click', (e) => {
-                if (els.searchContainer.classList.contains('expanded') && 
-                    !els.searchContainer.contains(e.target) && 
-                    !els.searchResultsDropdown.contains(e.target)) {
-                    closeGlobalSearch();
-                }
+            // Trigger da Busca (Lupa)
+            els.searchTrigger.addEventListener('click', (e) => { 
+                e.stopPropagation();
+                if(isListOpen) closeSearch(); 
+                else openSearch(); 
+                els.globalInput.focus(); 
             });
             
-            els.globalInput.addEventListener('input', handleGlobalSearchInput);
+            // Input da Busca
+            els.globalInput.addEventListener('input', () => {
+                if(!isListOpen) openSearch();
+                runSearchLogic(); 
+            });
+            
+            // Sidebar Search
             els.localSearch.addEventListener('input', handleLocalSearch);
-        }
 
-        function loadMap() {
-            const mapUrl = 'https://raw.githubusercontent.com/giuliano-macedo/brazil-states-geojson/master/brazil_states.svg';
-            fetch('assets/map.svg')
-                .then(res => { if(res.ok) return res.text(); throw new Error('Local fail'); })
-                .catch(() => fetch(mapUrl).then(r => r.text()))
-                .then(svgData => {
-                    if(els.mapWrapper) {
-                        els.mapWrapper.innerHTML = svgData;
-                        const svg = els.mapWrapper.querySelector('svg');
-                        if(svg) {
-                            svg.setAttribute('width', '100%');
-                            svg.setAttribute('height', '100%');
-                            svg.querySelectorAll('path').forEach(p => {
-                                const id = p.id || p.getAttribute('name');
-                                if(id && id.includes('-')) p.id = id.split('-')[1];
-                            });
-                            els.mapWrapper.appendChild(els.tooltip); 
-                            setupMapInteractions(svg);
-                        }
-                    }
-                });
-        }
-
-        function setupMapInteractions(svg) {
-            svg.querySelectorAll('path').forEach(p => {
-                p.classList.add('state-path');
-                if(p.id) {
-                    p.addEventListener('click', (e) => selectState(e.currentTarget.id.toUpperCase()));
-                    p.addEventListener('mouseenter', (e) => {
-                        const id = e.currentTarget.id.toUpperCase();
-                        const count = dbData.filter(d => d.estado === id).length;
-                        showTooltip(e, `${stateNames[id] || id} • ${count}`);
-                    });
-                    p.addEventListener('mousemove', moveTooltip);
-                    p.addEventListener('mouseleave', hideTooltip);
+            // Fechar ao clicar fora (Ignorando os botões de controle para não fechar acidentalmente)
+            document.addEventListener('click', (e) => {
+                if (isListOpen && 
+                    !els.searchContainer.contains(e.target) && 
+                    !els.searchResultsDropdown.contains(e.target) &&
+                    !els.btnActionCloud.contains(e.target) &&
+                    !els.btnLocal.contains(e.target) &&
+                    !els.btnServer.contains(e.target)
+                    ) { 
+                    closeSearch();
                 }
             });
         }
 
-        // --- FETCH DADOS ---
-        async function fetchData() {
-            // Local
-            const localRaw = (typeof BANCO_INTERNO !== 'undefined') ? BANCO_INTERNO : [];
-            const normalizedInternal = localRaw.map(item => ({
-                lc: String(item.lc),
-                serial: String(item.numero_serie),
-                selb: item.selb || '',
-                estado: item.uf ? item.uf.toUpperCase() : 'XX',
-                cidade: item.cidade,
-                data_registro: null,
-                source: 'local'
-            }));
+        // --- LÓGICA DE CONTROLE (BOTÕES DE TOPO) ---
+        window.toggleSource = function(type, e) {
+            e.stopPropagation(); // Impede que o clique feche o dropdown
+            
+            // 1. Alterna estado
+            filters[type] = !filters[type];
 
-            dbData = normalizedInternal;
-            updateGlobalStats();
+            // 2. Atualiza Visual do Botão
+            const btn = (type === 'local') ? els.btnLocal : els.btnServer;
+            btn.dataset.active = filters[type];
 
-            // Nuvem
-            const url = 'https://dpprinter-logs-ff3a7-default-rtdb.firebaseio.com/inventario.json';
-            try {
-                const response = await fetch(url);
-                const rawData = await response.json();
-                if (rawData) {
-                    const processedFirebase = [];
-                    for (const lcCode in rawData) {
-                        for (const serialKey in rawData[lcCode]) {
-                            const item = rawData[lcCode][serialKey];
-                            let dateObj = null;
-                            if (item.data_registro) dateObj = new Date(item.data_registro.replace(' ', 'T'));
-                            
-                            processedFirebase.push({
-                                lc: String(item.lc || lcCode),
-                                serial: String(item.serial),
-                                selb: item.selb || '',
-                                estado: item.estado ? item.estado.toUpperCase() : 'XX',
-                                cidade: item.cidade,
-                                data_registro: dateObj,
-                                source: 'server'
-                            });
-                        }
-                    }
-                    dbData = [...normalizedInternal, ...processedFirebase];
-                    updateGlobalStats();
-                }
-            } catch (error) { console.error("Erro Server", error); }
-        }
+            // 3. Atualiza KPIs e Mapa
+            updateGlobalKPIs();
 
-        function updateGlobalStats() {
-            if(els.kpiStates) els.kpiStates.textContent = [...new Set(dbData.filter(d => d.estado !== 'XX').map(d => d.estado))].length;
-            if(els.kpiRecords) els.kpiRecords.textContent = dbData.length.toLocaleString('pt-BR');
-        }
-
-        // --- FILTROS LÓGICA ---
-        function toggleGlobalSearch() {
-            els.searchContainer.classList.toggle('expanded');
-        }
-        function closeGlobalSearch() {
-            els.searchContainer.classList.remove('expanded');
-            els.searchResultsDropdown.classList.remove('has-results');
-            els.globalInput.blur();
-        }
-
-        // 1. Filtro de Fonte (Nuvem/Local)
-        window.setSourceFilter = function(source) {
-            filterSource = source;
-            document.querySelectorAll('.source-btn').forEach(btn => {
-                if(btn.dataset.source === source) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-            handleGlobalSearchInput(); // Re-aplica busca
-            els.globalInput.focus();
+            // 4. Se a lista estiver aberta, atualiza ela também imediatamente
+            if (isListOpen) {
+                runSearchLogic(true); 
+            }
         };
 
-        // 2. Filtro de Tipo (Serial/LC/SELB)
+        // --- AÇÃO: LISTAGEM (BOTÃO LATERAL) ---
+        window.listCloudPrinters = function(e) {
+            e.stopPropagation(); // Impede fechamento
+            
+            // Garante que a Nuvem esteja ativa para ver os resultados
+            if(!filters.server) {
+                filters.server = true;
+                els.btnServer.dataset.active = "true";
+            }
+            // NOTA: Não mexemos no estado do Local (se estava on, continua on = lista tudo)
+
+            // Atualiza KPIs
+            updateGlobalKPIs();
+
+            // Limpa o input (opcional, se quiser ver tudo)
+            els.globalInput.value = '';
+            
+            // Abre o dropdown
+            openSearch();
+            
+            // Força a renderização da lista
+            runSearchLogic(true); 
+        }
+
+        // --- FILTROS INTERNOS (Serial, LC, etc) ---
         window.setTypeFilter = function(type) {
             filterType = type;
             document.querySelectorAll('.type-filter-btn').forEach(btn => {
                 if(btn.dataset.type === type) btn.classList.add('active');
                 else btn.classList.remove('active');
             });
-            handleGlobalSearchInput(); // Re-aplica busca
-            els.globalInput.focus();
+            // Re-renderiza a lista se estiver aberta
+            if(isListOpen) runSearchLogic(true);
         };
 
-        function handleGlobalSearchInput() {
+        // --- FUNÇÕES DE BUSCA ---
+        function openSearch() {
+            isListOpen = true;
+            els.searchContainer.classList.add('expanded');
+            els.searchResultsDropdown.classList.add('visible');
+        }
+
+        window.closeSearch = function() { // Função Global
+            isListOpen = false;
+            els.searchContainer.classList.remove('expanded');
+            els.searchResultsDropdown.classList.remove('visible');
+            els.globalInput.blur();
+        }
+
+        function runSearchLogic(forceRender = false) {
             const query = els.globalInput.value.trim().toUpperCase();
             
-            // Se vazio, fecha
-            if (query.length === 0) {
-                els.searchResultsDropdown.classList.remove('has-results');
-                return;
-            }
+            // Pega dados baseados nos filtros ativos (Local/Server)
+            const activeData = getActiveData();
 
-            // Lógica Combinada
-            const matches = dbData.filter(d => {
-                // Checa Fonte
-                const sourceMatch = (filterSource === 'all') || (d.source === filterSource);
-                if (!sourceMatch) return false;
-
-                // Checa Tipo + Query
+            // Filtra por texto E tipo
+            const matches = activeData.filter(d => {
+                // Filtro de Texto
                 const q = query;
                 const matchSerial = d.serial.toUpperCase().includes(q);
                 const matchLC = d.lc.toUpperCase().includes(q);
                 const matchSELB = d.selb && d.selb.toUpperCase().includes(q);
 
-                if (filterType === 'all') return (matchSerial || matchLC || matchSELB);
-                if (filterType === 'serial') return matchSerial;
-                if (filterType === 'lc') return matchLC;
-                if (filterType === 'selb') return matchSELB;
-                
-                return false;
-            }).slice(0, 50);
+                // Filtro de Tipo
+                let typeMatch = false;
+                if (filterType === 'all') typeMatch = (matchSerial || matchLC || matchSELB);
+                else if (filterType === 'serial') typeMatch = matchSerial;
+                else if (filterType === 'lc') typeMatch = matchLC;
+                else if (filterType === 'selb') typeMatch = matchSELB;
 
-            renderSearchResults(matches, query);
+                // Se não tem texto digitado, e forçou renderização (ex: clicou botão), mostra tudo
+                if (forceRender && query.length === 0) return true;
+                
+                // Se não tem texto e não foi forçado, retorna falso (esconde, a menos que listOpen esteja true por outro motivo)
+                if (!forceRender && query.length === 0) return true; // Mudança: se input vazio, mostra lista completa se estiver aberta
+
+                return typeMatch;
+            }).slice(0, 100); 
+
+            // Atualiza Label do Header
+            if (query.length === 0) els.listHeaderLabel.textContent = "Listagem Completa (Ativos)";
+            else els.listHeaderLabel.textContent = "Resultados da Busca";
+
+            renderSearchResults(matches, query, activeData.length);
         }
 
-        function renderSearchResults(matches, query) {
+        function renderSearchResults(matches, query, totalActive) {
             els.searchResultsList.innerHTML = '';
             els.resultsCount.textContent = matches.length;
 
             if (matches.length === 0) {
-                els.searchResultsList.innerHTML = `
-                    <div class="p-8 text-center flex flex-col items-center text-slate-400">
-                        <span class="text-sm font-medium">Nada encontrado.</span>
-                    </div>`;
+                els.searchResultsList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Nenhum registro encontrado nos filtros ativos.</div>`;
             } else {
                 matches.forEach(match => {
                     const el = document.createElement('div');
                     el.className = 'p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-all rounded-lg group flex justify-between items-center';
                     
-                    const highlight = (text) => text ? text.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<span class="text-indigo-600 font-black bg-indigo-50 px-0.5 rounded">${m}</span>`) : '';
+                    const highlight = (text) => (query && text) ? text.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<span class="text-indigo-600 font-black bg-indigo-50 px-0.5 rounded">${m}</span>`) : (text || '');
 
                     const sourceBadge = match.source === 'local' 
                         ? `<span class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1 rounded border border-slate-200" title="Local">L</span>`
@@ -448,27 +439,107 @@
                                 <span class="truncate max-w-[150px]">${match.cidade || match.estado}</span>
                             </div>
                         </div>
-                        <div class="text-right flex-shrink-0">
-                            <span class="text-[10px] font-bold text-slate-300 group-hover:text-indigo-500 transition-colors">VER &rarr;</span>
+                        <div class="text-right flex-shrink-0 flex flex-col items-end">
+                            <span class="text-[9px] font-bold text-slate-300 group-hover:text-indigo-500 transition-colors mt-0.5">ABRIR &rarr;</span>
                         </div>
                     `;
-
                     el.addEventListener('click', () => {
                         selectState(match.estado, match.lc);
-                        closeGlobalSearch();
+                        closeSearch(); 
                     });
-
                     els.searchResultsList.appendChild(el);
                 });
             }
-            els.searchResultsDropdown.classList.add('has-results');
         }
 
-        // --- SIDEBAR ---
+        // --- FETCH DADOS ---
+        async function fetchData() {
+            const localRaw = (typeof BANCO_INTERNO !== 'undefined') ? BANCO_INTERNO : [];
+            const normalizedInternal = localRaw.map(item => ({
+                lc: String(item.lc), serial: String(item.numero_serie), selb: item.selb || '',
+                estado: item.uf ? item.uf.toUpperCase() : 'XX', cidade: item.cidade,
+                data_registro: null, source: 'local'
+            }));
+
+            let processedFirebase = [];
+            const url = 'https://dpprinter-logs-ff3a7-default-rtdb.firebaseio.com/inventario.json';
+            try {
+                const response = await fetch(url);
+                const rawData = await response.json();
+                if (rawData) {
+                    for (const lcCode in rawData) {
+                        for (const serialKey in rawData[lcCode]) {
+                            const item = rawData[lcCode][serialKey];
+                            let dateObj = null;
+                            if (item.data_registro) dateObj = new Date(item.data_registro.replace(' ', 'T'));
+                            processedFirebase.push({
+                                lc: String(item.lc || lcCode), serial: String(item.serial), selb: item.selb || '',
+                                estado: item.estado ? item.estado.toUpperCase() : 'XX', cidade: item.cidade,
+                                data_registro: dateObj, source: 'server'
+                            });
+                        }
+                    }
+                }
+            } catch (error) { console.error("Erro Server", error); }
+
+            dbData = [...normalizedInternal, ...processedFirebase];
+            updateGlobalKPIs();
+        }
+
+        function getActiveData() {
+            return dbData.filter(d => {
+                if (d.source === 'local' && !filters.local) return false;
+                if (d.source === 'server' && !filters.server) return false;
+                return true;
+            });
+        }
+
+        function updateGlobalKPIs() {
+            const activeData = getActiveData();
+            if(els.kpiStates) els.kpiStates.textContent = [...new Set(activeData.filter(d => d.estado !== 'XX').map(d => d.estado))].length;
+            if(els.kpiRecords) els.kpiRecords.textContent = activeData.length.toLocaleString('pt-BR');
+        }
+
+        // --- MAPA E SIDEBAR ---
+        function loadMap() {
+            const mapUrl = 'https://raw.githubusercontent.com/giuliano-macedo/brazil-states-geojson/master/brazil_states.svg';
+            fetch('assets/map.svg').then(r => r.ok ? r.text() : fetch(mapUrl).then(r=>r.text())).then(svgData => {
+                if(els.mapWrapper) {
+                    els.mapWrapper.innerHTML = svgData;
+                    const svg = els.mapWrapper.querySelector('svg');
+                    if(svg) {
+                        svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%');
+                        svg.querySelectorAll('path').forEach(p => {
+                            const id = p.id || p.getAttribute('name');
+                            if(id && id.includes('-')) p.id = id.split('-')[1];
+                        });
+                        els.mapWrapper.appendChild(els.tooltip); 
+                        setupMapInteractions(svg);
+                    }
+                }
+            });
+        }
+
+        function setupMapInteractions(svg) {
+            svg.querySelectorAll('path').forEach(p => {
+                p.classList.add('state-path');
+                if(p.id) {
+                    p.addEventListener('click', (e) => selectState(e.currentTarget.id.toUpperCase()));
+                    p.addEventListener('mouseenter', (e) => {
+                        const id = e.currentTarget.id.toUpperCase();
+                        const activeData = getActiveData();
+                        const count = activeData.filter(d => d.estado === id).length;
+                        showTooltip(e, `${stateNames[id] || id} • ${count}`);
+                    });
+                    p.addEventListener('mousemove', moveTooltip);
+                    p.addEventListener('mouseleave', hideTooltip);
+                }
+            });
+        }
+
         function selectState(uf, targetLc = null) {
             if(!uf || uf === 'XX') return;
             activeState = uf;
-            
             document.querySelectorAll('.state-path').forEach(p => p.classList.remove('active'));
             const el = document.getElementById(uf) || document.getElementById(uf.toLowerCase());
             if(el) el.classList.add('active');
@@ -476,7 +547,6 @@
             if(els.mapWrapper) els.mapWrapper.classList.add('has-active');
             if(els.sidebar) els.sidebar.classList.remove('translate-x-full');
             if(els.globalStats) els.globalStats.classList.add('translate-y-20', 'opacity-0');
-
             els.localSearch.value = ''; 
             populateSidebar(uf, targetLc);
         }
@@ -490,7 +560,8 @@
         }
 
         function populateSidebar(uf, targetLc = null) {
-            const stateData = dbData.filter(d => d.estado === uf);
+            const activeData = getActiveData();
+            const stateData = activeData.filter(d => d.estado === uf);
             const lcs = [...new Set(stateData.map(d => d.lc))].sort();
 
             els.dStateName.textContent = stateNames[uf] || uf;
@@ -501,7 +572,7 @@
             els.noFilterResults.classList.add('hidden');
 
             if (lcs.length === 0) {
-                els.lcList.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-10">Vazio.</p>`;
+                els.lcList.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-10">Nenhum dado ativo.</p>`;
                 return;
             }
 
@@ -563,7 +634,6 @@
                 card.appendChild(header);
                 card.appendChild(details);
                 els.lcList.appendChild(card);
-
                 if(isTarget) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
             });
         }
